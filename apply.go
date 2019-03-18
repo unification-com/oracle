@@ -30,7 +30,7 @@ func main() {
 	downstream := argsWithoutProg[0]
 	upload_key := argsWithoutProg[1]
 
-	workchainChainId, err := strconv.ParseUint(argsWithoutProg[2], 10, 0)
+	wrkchainChainId, err := strconv.ParseUint(argsWithoutProg[2], 10, 0)
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(2)
@@ -77,7 +77,7 @@ func main() {
 	evs = append(evs, fromAddress)
 
 	copy(GenesisHash[:], []byte(genesis_hash))
-	address, tx, _, err := store.DeployStore(auth, client, workchainChainId, GenesisHash, evs)
+	address, tx, _, err := store.DeployStore(auth, client, wrkchainChainId, GenesisHash, evs)
 	if err != nil {
 		log.Fatal(err)
 	}

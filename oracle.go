@@ -34,7 +34,7 @@ func main() {
 		os.Exit(2)
 	}
 
-	workchainChainId, err := strconv.ParseUint(argsWithoutProg[5], 10, 0)
+	wrkchainChainId, err := strconv.ParseUint(argsWithoutProg[5], 10, 0)
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(2)
@@ -59,7 +59,7 @@ func main() {
 
 	for {
 
-		fmt.Printf("Reading block header from Workchain RPC node: %s\n", upstream)
+		fmt.Printf("Reading block header from WRKChain RPC node: %s\n", upstream)
 
 		block, err := client_upstream.BlockByNumber(context.Background(), nil)
 		if err != nil {
@@ -106,7 +106,7 @@ func main() {
 
 		fmt.Printf("Sending hashes to Mainchain contract: %s via %s\n", contract_address, downsteam)
 
-		fmt.Printf("chain ID: %d\n", workchainChainId)
+		fmt.Printf("chain ID: %d\n", wrkchainChainId)
 		fmt.Printf("block: %d\n", Height)
 		fmt.Printf("hash: %s\n",  block.Hash().Hex())
 		fmt.Printf("parent hash: %s\n",  block.ParentHash().Hex())
@@ -115,7 +115,7 @@ func main() {
 		fmt.Printf("state root: %s\n",  block.Root().Hex())
 		fmt.Printf("sender: %s\n",  fromAddress.Hex())
 
-		tx, err := instance.RecordHeader(auth, Height, block.Hash(), block.ParentHash(), block.ReceiptHash(), block.TxHash(), block.Root(), fromAddress, workchainChainId)
+		tx, err := instance.RecordHeader(auth, Height, block.Hash(), block.ParentHash(), block.ReceiptHash(), block.TxHash(), block.Root(), fromAddress, wrkchainChainId)
 		if err != nil {
 			log.Fatal(err)
 		}
