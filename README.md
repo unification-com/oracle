@@ -15,7 +15,7 @@ geth init ~/.go/src/github.com/unification-com/haiku-core/native/mainchain/Docke
 
 ### Copy in the static nodes
 ```
-cp ~/.go/src/github.com/unification-com/haiku-core/native/mainchain/Docker/validator/bootnode_keys/static-nodes.json /Users/indika/Library/UndWorkchain/geth
+cp ~/.go/src/github.com/unification-com/haiku-core/native/mainchain/Docker/validator/bootnode_keys/static-nodes.json /Users/indika/Library/UndWRKChain/geth
 ```
 
 ### And start up your light client
