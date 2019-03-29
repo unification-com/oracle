@@ -15,7 +15,7 @@ import (
 	"github.com/unification-com/mainchain/crypto"
 	"github.com/unification-com/mainchain/ethclient"
 
-	store "./contracts"
+	store "github.com/unification-com/oracle/contracts"
 )
 
 func main() {
