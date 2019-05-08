@@ -222,8 +222,6 @@ func regWrkchain(ctx *cli.Context) error {
 	totalAmount := big.NewInt(0)
 	totalAmount.Add(depositAmount, big.NewInt(0).SetUint64(approxGas))
 
-	//todo: check balance is enough to cover registering
-
 	fmt.Printf("depositAmount %v\n", depositAmount.Int64())
 	fmt.Printf("totalAmount %v\n", totalAmount.Int64())
 
