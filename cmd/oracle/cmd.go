@@ -7,21 +7,17 @@ import (
 	"fmt"
 	"github.com/unification-com/mainchain/accounts"
 	"github.com/unification-com/mainchain/accounts/abi/bind"
-
-	//"github.com/unification-com/mainchain/accounts/abi/bind"
 	"github.com/unification-com/mainchain/accounts/keystore"
 	"github.com/unification-com/mainchain/common"
-	wrkchainroot "github.com/unification-com/mainchain/contracts/wrkchainroot"
+	wrkchainroot "github.com/unification-com/mainchain/contracts/wrkchainroot/contract"
 	"github.com/unification-com/mainchain/core"
 	"github.com/unification-com/mainchain/crypto"
 	"github.com/unification-com/mainchain/ethclient"
 	"gopkg.in/urfave/cli.v1"
-	"io"
 	"io/ioutil"
-	//"math/big"
+	"math/big"
 	"os"
 	"path/filepath"
-	"runtime"
 	"strings"
 )
 
@@ -58,6 +54,8 @@ The init command initialises the Oracle, creating a secure wallet for running.`,
 			DataDirectoryFlag,
 			GenesisPathFlag,
 			AuthorisedAccountsFlag,
+			MainchainJsonRpcFlag,
+			UndTestnetFlag,
 		},
 		Category: "ORACLE COMMANDS",
 		Description: `
@@ -149,10 +147,10 @@ func regWrkchain(ctx *cli.Context) error {
 
 	block := genesis.ToBlock(nil)
 
-	genesisHash := block.Hash().Hex()
+	genesisHash := block.Hash()
 	wrkchainNetworkId := genesis.Config.ChainId
 
-	fmt.Println("genesisHash:", genesisHash)
+	fmt.Println("genesisHash:", genesisHash.Hex())
 	fmt.Println("wrkchainNetworkId:", wrkchainNetworkId)
 
 	// Process authorised addresses
@@ -160,8 +158,10 @@ func regWrkchain(ctx *cli.Context) error {
 		Fatalf("List of Authorised addresses required required")
 	}
 
+	thisAccount := common.HexToAddress(strings.TrimSpace(ctx.String(AccountUnlockFlag.Name)))
+
 	// add this account by default
-	authAddresses := []common.Address{common.HexToAddress(strings.TrimSpace(ctx.String(AccountUnlockFlag.Name)))}
+	authAddresses := []common.Address{thisAccount}
 
 	addressParts := strings.Split(strings.TrimSpace(ctx.String(AuthorisedAccountsFlag.Name)), ",")
 
@@ -177,24 +177,73 @@ func regWrkchain(ctx *cli.Context) error {
 		Fatalf("At least one valid authorised address required")
 	}
 
-	// make connection to Mainchain
-	wrkchainRootContract := initialiseConnnection(ctx)
+	// Create a new WRKChainRoot Session
+	ctxBg := context.Background()
+	wrkchainRootSession := NewWrkchainRootSession(ctx, ctxBg)
 
-	wrkChainList, err := wrkchainRootContract.WrkchainList(wrkchainNetworkId)
-
+	// Connect
+	fmt.Printf("Connecting to Mainchain JSON RPC at: %v\n", ctx.String(MainchainJsonRpcFlag.Name))
+	mainchainClient, err := ethclient.Dial(strings.TrimSpace(ctx.String(MainchainJsonRpcFlag.Name)))
 	if err != nil {
-		Fatalf("Couldn't query WrkchainList", "err", err)
+		Fatalf("Couldn't connect to Mainchain", "err", err)
 	}
 
-	reggedGenHash := string(wrkChainList.GenesisHash[:])
+	balance, _ := mainchainClient.BalanceAt(ctxBg, thisAccount, nil)
+	fmt.Printf("Balance: %d\n",balance)
 
-	fmt.Printf("wrkChainList.GenesisHash: %v", reggedGenHash)
+	wrkchainRootSession = LoadContract(wrkchainRootSession, mainchainClient)
+
+	var filterOpts = new(bind.FilterOpts)
+	filterOpts.Start = 0
+	filterOpts.End = nil
+	filterOpts.Context = ctxBg
+
+	wrkchainIdFilterList := make([]*big.Int, 0)
+	wrkchainIdFilterList = append(wrkchainIdFilterList, wrkchainNetworkId)
+
+	registerWrkChainEvents, err := wrkchainRootSession.Contract.FilterRegisterWrkChain(filterOpts, wrkchainIdFilterList)
+	if err != nil {
+		Fatalf("failed to filter for RegisterWrkChain events: %v", err)
+	}
+
+	defer registerWrkChainEvents.Close()
+
+	if registerWrkChainEvents.Next() {
+		fmt.Printf("Found WRKChain ID: %v\nwith Genesis Hash: %v\n", registerWrkChainEvents.Event.ChainId.String(), registerWrkChainEvents.Event.GenesisHash)
+		Fatalf("WRKChain already registered in Tx: %v", registerWrkChainEvents.Event.Raw.TxHash.Hex())
+	}
+
+	// gather up params
+	depositAmount := big.NewInt(1)
+	depositAmount.Mul(depositAmount, big.NewInt(1000000000000000000))
+
+	nonce, _ := mainchainClient.NonceAt(ctxBg, thisAccount, nil)
+	fmt.Printf("NonceAt: %v\n", nonce)
+
+	gasPrice, err := mainchainClient.SuggestGasPrice(context.Background())
+	if err != nil {
+		Fatalf("Couldn't get gas price", "err", err)
+	}
+
+	fmt.Printf("gas price: %v\n", gasPrice)
+
+	wrkchainRootSession.TransactOpts.Value = depositAmount
+	wrkchainRootSession.TransactOpts.Nonce = big.NewInt(int64(nonce))
+	wrkchainRootSession.TransactOpts.GasLimit = uint64(300000)
+	wrkchainRootSession.TransactOpts.GasPrice = gasPrice
+
+	tx, err := wrkchainRootSession.RegisterWrkChain(wrkchainNetworkId, authAddresses, genesisHash)
+
+	if err != nil {
+		Fatalf("Couldn't register WRKChain", "err", err)
+	}
+
+	fmt.Printf("RegisterWrkChain tx sent: %s\n", tx.Hash().Hex())
 
 	return nil
 }
 
-func initialiseConnnection(ctx *cli.Context) *wrkchainroot.WrkchainRoot {
-
+func NewWrkchainRootSession(ctx *cli.Context, bgCtx context.Context) (session wrkchainroot.WRKChainRootSession) {
 	// Grab the password
 	if !ctx.IsSet(PasswordPathFlag.Name) {
 		Fatalf("Path to password file required")
@@ -225,79 +274,38 @@ func initialiseConnnection(ctx *cli.Context) *wrkchainroot.WrkchainRoot {
 		Fatalf("Could not find account. Did you init first?: ", "err", err)
 	}
 
-	fh, err := os.Open(thisAcc.URL.Path)
+	keystore, err := os.Open(thisAcc.URL.Path)
 	if err != nil {
-		Fatalf("Couldn't open Keystore", "err", err)
+		Fatalf("Couldn't read Keystore", "err", err)
 	}
-	defer fh.Close()
+	defer keystore.Close()
 
-	var reader io.Reader = fh
-	txOpts, err := bind.NewTransactor(reader, pass)
+	auth, err := bind.NewTransactor(keystore, pass)
 	if err != nil {
 		Fatalf("Couldn't bind transactor", "err", err)
 	}
 
-	// Todo: take RPC from flags
-	mainchainClient, err := ethclient.Dial(DefaultMainchainTestnetRPC)
+	fmt.Printf("auth.From: %v\n", auth.From.Hex())
+	fmt.Printf("auth.Nonce: %v\n", auth.Nonce)
+
+	return wrkchainroot.WRKChainRootSession{
+		TransactOpts: *auth,
+		CallOpts: bind.CallOpts{
+			Pending: true,
+			From:    auth.From,
+			Context: bgCtx,
+		},
+	}
+
+}
+
+func LoadContract(session wrkchainroot.WRKChainRootSession, client *ethclient.Client) wrkchainroot.WRKChainRootSession {
+	addr := common.HexToAddress(WRKChainRootContractAddress)
+	instance, err := wrkchainroot.NewWRKChainRoot(addr, client)
 	if err != nil {
-		Fatalf("Couldn't connect to Mainchain", "err", err)
+		Fatalf("could not load contract: %v\n", err)
 	}
-
-	balance, _ := mainchainClient.BalanceAt(context.Background(), common.HexToAddress(account), nil)
-	fmt.Printf("Balance: %d\n",balance)
-
-	// Todo - check balance is sufficient for registering
-
-	wrkchainRootContract, err := wrkchainroot.NewWrkchainRoot(txOpts, common.HexToAddress(WRKChainRootContractAddress), mainchainClient)
-
-	if err != nil {
-		Fatalf("Couldn't bind WRKChainRoot contract", "err", err)
-	}
-
-	return wrkchainRootContract
+	session.Contract = instance
+	return session
 }
 
-
-// DefaultDataDir is the default data directory to use for the databases and other
-// persistence requirements.
-func DefaultDataDir() string {
-	// Try to place the data folder in the user's home dir
-	home := homeDir()
-	if home != "" {
-		if runtime.GOOS == "darwin" {
-			return filepath.Join(home, "Library", "WrkchainOracle")
-		} else if runtime.GOOS == "windows" {
-			return filepath.Join(home, "AppData", "Roaming", "WrkchainOracle")
-		} else {
-			return filepath.Join(home, ".wrkchain_oracle")
-		}
-	}
-	// As we cannot guess a stable location, return empty and handle later
-	return ""
-}
-
-// Fatalf formats a message to standard error and exits the program.
-// The message is also printed to standard output if standard error
-// is redirected to a different file.
-func Fatalf(format string, args ...interface{}) {
-	w := io.MultiWriter(os.Stdout, os.Stderr)
-	if runtime.GOOS == "windows" {
-		// The SameFile check below doesn't work on Windows.
-		// stdout is unlikely to get redirected though, so just print there.
-		w = os.Stdout
-	} else {
-		outf, _ := os.Stdout.Stat()
-		errf, _ := os.Stderr.Stat()
-		if outf != nil && errf != nil && os.SameFile(outf, errf) {
-			w = os.Stderr
-		}
-	}
-	fmt.Fprintf(w, "Fatal: "+format+"\n", args...)
-	os.Exit(1)
-}
-
-func MkDataDir(dirPath string) {
-	if err := os.MkdirAll(dirPath, 0700); err != nil {
-		Fatalf("Could not create datadir", "datadir", dirPath, "err", err)
-	}
-}

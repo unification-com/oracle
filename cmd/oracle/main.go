@@ -13,6 +13,8 @@ var (
 
 	commonFlags = []cli.Flag{
 		DataDirectoryFlag,
+		UndTestnetFlag,
+		MainchainJsonRpcFlag,
 	}
 
     regFlags = []cli.Flag{
