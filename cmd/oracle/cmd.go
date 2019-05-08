@@ -217,8 +217,19 @@ func regWrkchain(ctx *cli.Context) error {
 	// gather up params
 	deposit, err := mainchainClient.StorageAt(ctxBg, common.HexToAddress(WRKChainRootContractAddress), common.HexToHash(DepositStorageAddress), nil)
 	depositAmount := big.NewInt(0).SetBytes(deposit)
+	approxGas := uint64(300000)
+
+	totalAmount := big.NewInt(0)
+	totalAmount.Add(depositAmount, big.NewInt(0).SetUint64(approxGas))
+
+	//todo: check balance is enough to cover registering
 
 	fmt.Printf("depositAmount %v\n", depositAmount.Int64())
+	fmt.Printf("totalAmount %v\n", totalAmount.Int64())
+
+	if balance.Cmp(totalAmount) == -1 {
+		Fatalf("Not enough UND to register\n")
+	}
 
 	nonce, _ := mainchainClient.NonceAt(ctxBg, thisAccount, nil)
 	fmt.Printf("NonceAt: %v\n", nonce)
@@ -228,12 +239,11 @@ func regWrkchain(ctx *cli.Context) error {
 		Fatalf("Couldn't get gas price", "err", err)
 	}
 
-	//todo: check balance is enough to cover registering
 	fmt.Printf("gas price: %v\n", gasPrice)
 
 	wrkchainRootSession.TransactOpts.Value = depositAmount
 	wrkchainRootSession.TransactOpts.Nonce = big.NewInt(int64(nonce))
-	wrkchainRootSession.TransactOpts.GasLimit = uint64(300000)
+	wrkchainRootSession.TransactOpts.GasLimit = approxGas
 	wrkchainRootSession.TransactOpts.GasPrice = gasPrice
 
 	tx, err := wrkchainRootSession.RegisterWrkChain(wrkchainNetworkId, authAddresses, genesisHash)
