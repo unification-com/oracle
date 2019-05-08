@@ -23,6 +23,7 @@ import (
 
 const (
 	WRKChainRootContractAddress = "0x0000000000000000000000000000000000000087"
+	DepositStorageAddress       = "0x0000000000000000000000000000000000000000000000000000000000000000"
 	DefaultMainchainTestnetRPC  = "http://67.231.18.141:8101"
 	DefaultMainchainMainnetRPC  = "http://67.231.18.141:8101"
 )
@@ -214,8 +215,10 @@ func regWrkchain(ctx *cli.Context) error {
 	}
 
 	// gather up params
-	depositAmount := big.NewInt(1)
-	depositAmount.Mul(depositAmount, big.NewInt(1000000000000000000))
+	deposit, err := mainchainClient.StorageAt(ctxBg, common.HexToAddress(WRKChainRootContractAddress), common.HexToHash(DepositStorageAddress), nil)
+	depositAmount := big.NewInt(0).SetBytes(deposit)
+
+	fmt.Printf("depositAmount %v\n", depositAmount.Int64())
 
 	nonce, _ := mainchainClient.NonceAt(ctxBg, thisAccount, nil)
 	fmt.Printf("NonceAt: %v\n", nonce)
@@ -225,6 +228,7 @@ func regWrkchain(ctx *cli.Context) error {
 		Fatalf("Couldn't get gas price", "err", err)
 	}
 
+	//todo: check balance is enough to cover registering
 	fmt.Printf("gas price: %v\n", gasPrice)
 
 	wrkchainRootSession.TransactOpts.Value = depositAmount
