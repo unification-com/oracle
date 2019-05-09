@@ -43,14 +43,12 @@ func Fatalf(format string, args ...interface{}) {
 		}
 	}
 	fmt.Fprintf(w, "Fatal: "+format+"\n", args...)
+	fmt.Println()
 	os.Exit(1)
 }
-
-
 
 func MkDataDir(dirPath string) {
 	if err := os.MkdirAll(dirPath, 0700); err != nil {
 		Fatalf("Could not create datadir", "datadir", dirPath, "err", err)
 	}
 }
-
