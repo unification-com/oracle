@@ -49,8 +49,8 @@ func init() {
 	app.Copyright = "Copyright (c) 2019 Unification Foundation"
 	app.Commands = []cli.Command{
 		initCommand,
-		regCommand,
-		recCommand,
+		registerCommand,
+		recordCommand,
 	}
 	sort.Sort(cli.CommandsByName(app.Commands))
 

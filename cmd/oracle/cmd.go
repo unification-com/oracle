@@ -46,7 +46,7 @@ var (
 The init command initialises the Oracle, creating a secure wallet for running.`,
 	}
 
-	regCommand = cli.Command{
+	registerCommand = cli.Command{
 		Action:    registerWrkchain,
 		Name:      "register",
 		Usage:     "Register a WRKChain",
@@ -65,7 +65,7 @@ The init command initialises the Oracle, creating a secure wallet for running.`,
 The register command registers a new WRKChain on the UND Mainchain`,
 	}
 
-	recCommand = cli.Command{
+	recordCommand = cli.Command{
 		Action:    recordWrkchainBlock,
 		Name:      "record",
 		Usage:     "Record WRKChain Block header hashes",
