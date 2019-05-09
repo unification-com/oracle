@@ -25,31 +25,31 @@ var (
 	}
 	UndTestnetFlag = cli.BoolFlag{
 		Name:  "und-testnet",
-		Usage: "und test network",
+		Usage: "configure for und test network",
 	}
 
 	// Registration flags
 	GenesisPathFlag = cli.StringFlag{
 		Name:  "genesis",
-		Usage: "Path to the WRKChain's genesis.json",
+		Usage: "Full path to the WRKChain's genesis.json. E.g.: /path/to/genesis.json",
 	}
 	AuthorisedAccountsFlag = cli.StringFlag{
 		Name:  "auth",
-		Usage: "Comma separated list of addresses authorised to write to the WRKChain Root smart contract",
+		Usage: "Comma separated list of addresses authorised to write to the WRKChain Root smart contract. No spaces. E.g.: 0x160B51e66e51327ac31C643f7675B8A9006aEE1E,0xbEc4127468c51fF89719DBcA5DC57F39C0049f06",
 	}
 
 	// Account flags
 	PasswordPathFlag = cli.StringFlag{
 		Name:  "password",
-		Usage: "Path to the account password",
+		Usage: "Full path to the account password file. E.g. /path/to/.password",
 	}
 	PrivateKeyPathFlag = cli.StringFlag{
 		Name:  "key",
-		Usage: "Path to the private key",
+		Usage: "Full path to the private key file. E.g. /path/to/.private_key",
 	}
 	AccountUnlockFlag = cli.StringFlag{
 		Name:  "account",
-		Usage: "Account to unlock - will be used tp write to the WRKChain Root smart contract",
+		Usage: "Account to unlock - will be used tp write to the WRKChain Root smart contract when register and record commands are run. E.g. 0x160B51e66e51327ac31C643f7675B8A9006aEE1E",
 	}
 
 	// WRKChain flags
@@ -61,6 +61,22 @@ var (
 		Name:  "freq",
 		Usage: "Frequency WRKChain block hashes are written, in seconds. Default 3600",
 		Value: 3600,
+	}
+	RecordParentHashFlag = cli.BoolFlag{
+		Name: "hash.parent",
+		Usage: "If set, WRKChain Oracle will submit the WRKChain's parent hash",
+	}
+	RecordReceiptRootFlag = cli.BoolFlag{
+		Name: "hash.receipt",
+		Usage: "If set, WRKChain Oracle will submit the WRKChain's Receipt Root hash",
+	}
+	RecordTxRootFlag = cli.BoolFlag{
+		Name: "hash.tx",
+		Usage: "If set, WRKChain Oracle will submit the WRKChain's Tx Root hash",
+	}
+	RecordStateRootFlag = cli.BoolFlag{
+		Name: "hash.state",
+		Usage: "If set, WRKChain Oracle will submit the WRKChain's State Root hash",
 	}
 )
 
