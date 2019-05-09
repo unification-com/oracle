@@ -44,7 +44,7 @@ func init() {
 	app.Name = "oracle"
 	app.Author = "Unification Foundation"
 	app.Email = "hello@unification.com"
-	app.Usage = "WRKChain Oracle"
+	app.Usage = "WRKChain Oracle - registers a WRKCHain on UND Mainchain, and records a WRKChain's hashes on Mainchain"
 	app.Version = Version
 	app.Copyright = "Copyright (c) 2019 Unification Foundation"
 	app.Commands = []cli.Command{
