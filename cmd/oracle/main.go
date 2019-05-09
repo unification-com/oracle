@@ -31,6 +31,10 @@ var (
     wrkchainFlags = []cli.Flag{
 		WRKChainJsonRPCFlag,
 		WriteFrequencyFlag,
+		RecordParentHashFlag,
+		RecordReceiptRootFlag,
+		RecordTxRootFlag,
+		RecordStateRootFlag,
 	}
 )
 
@@ -38,7 +42,7 @@ func init() {
 
 	app.Action = oracle
 	app.Name = "oracle"
-	app.Author = "Unification"
+	app.Author = "Unification Foundation"
 	app.Email = "hello@unification.com"
 	app.Usage = "WRKChain Oracle"
 	app.Version = Version
@@ -46,6 +50,7 @@ func init() {
 	app.Commands = []cli.Command{
 		initCommand,
 		regCommand,
+		recCommand,
 	}
 	sort.Sort(cli.CommandsByName(app.Commands))
 
