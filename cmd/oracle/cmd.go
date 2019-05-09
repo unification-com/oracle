@@ -9,6 +9,7 @@ import (
 	"github.com/unification-com/mainchain/accounts/abi/bind"
 	"github.com/unification-com/mainchain/accounts/keystore"
 	"github.com/unification-com/mainchain/common"
+	"github.com/unification-com/mainchain/common/hexutil"
 	wrkchainroot "github.com/unification-com/mainchain/contracts/wrkchainroot/contract"
 	"github.com/unification-com/mainchain/core"
 	"github.com/unification-com/mainchain/crypto"
@@ -127,6 +128,8 @@ func initOracle(ctx *cli.Context) error {
 
 func regWrkchain(ctx *cli.Context) error {
 
+	fmt.Println()
+	ctxBg := context.Background()
 	MkDataDir(ctx.String(DataDirectoryFlag.Name))
 
 	// Process Genesis. Note - only geth based genesis blocks supported at this time
@@ -151,8 +154,9 @@ func regWrkchain(ctx *cli.Context) error {
 	genesisHash := block.Hash()
 	wrkchainNetworkId := genesis.Config.ChainId
 
-	fmt.Println("genesisHash:", genesisHash.Hex())
-	fmt.Println("wrkchainNetworkId:", wrkchainNetworkId)
+	fmt.Println("Registering WRKChain with:")
+	fmt.Println("WRKChain Genesis Hash:", genesisHash.Hex())
+	fmt.Println("WRKChain Network ID:", wrkchainNetworkId)
 
 	// Process authorised addresses
 	if ! ctx.IsSet(AuthorisedAccountsFlag.Name) {
@@ -179,21 +183,22 @@ func regWrkchain(ctx *cli.Context) error {
 	}
 
 	// Create a new WRKChainRoot Session
-	ctxBg := context.Background()
 	wrkchainRootSession := NewWrkchainRootSession(ctx, ctxBg)
 
 	// Connect
-	fmt.Printf("Connecting to Mainchain JSON RPC at: %v\n", ctx.String(MainchainJsonRpcFlag.Name))
+	fmt.Println("Connecting to Mainchain JSON RPC on", ctx.String(MainchainJsonRpcFlag.Name))
 	mainchainClient, err := ethclient.Dial(strings.TrimSpace(ctx.String(MainchainJsonRpcFlag.Name)))
 	if err != nil {
 		Fatalf("Couldn't connect to Mainchain", "err", err)
 	}
 
 	balance, _ := mainchainClient.BalanceAt(ctxBg, thisAccount, nil)
-	fmt.Printf("Balance: %d\n",balance)
+	// ToDo: output balance in UND
+	fmt.Println("Balance for", ctx.String(AccountUnlockFlag.Name), balance)
 
 	wrkchainRootSession = LoadContract(wrkchainRootSession, mainchainClient)
 
+	// Query RegisterWrkChain event to see if WRKChain has already been registered
 	var filterOpts = new(bind.FilterOpts)
 	filterOpts.Start = 0
 	filterOpts.End = nil
@@ -204,29 +209,35 @@ func regWrkchain(ctx *cli.Context) error {
 
 	registerWrkChainEvents, err := wrkchainRootSession.Contract.FilterRegisterWrkChain(filterOpts, wrkchainIdFilterList)
 	if err != nil {
-		Fatalf("failed to filter for RegisterWrkChain events: %v", err)
+		Fatalf("failed to filter for RegisterWrkChain events:", "err", err)
 	}
 
 	defer registerWrkChainEvents.Close()
 
 	if registerWrkChainEvents.Next() {
-		fmt.Printf("Found WRKChain ID: %v\nwith Genesis Hash: %v\n", registerWrkChainEvents.Event.ChainId.String(), registerWrkChainEvents.Event.GenesisHash)
-		Fatalf("WRKChain already registered in Tx: %v", registerWrkChainEvents.Event.Raw.TxHash.Hex())
+		// already registered. Output info and exit
+		fmt.Println("Found WRKChain ID:", registerWrkChainEvents.Event.ChainId.String())
+		fmt.Println("with Genesis Hash", hexutil.Encode(registerWrkChainEvents.Event.GenesisHash[:]))
+		Fatalf("WRKChain already registered in Tx", registerWrkChainEvents.Event.Raw.TxHash.Hex())
 	}
 
-	// gather up params
+	// gather up params for registering WRKChain
+	// Required deposit amount held in first storage value in WRKChain Root contract
 	deposit, err := mainchainClient.StorageAt(ctxBg, common.HexToAddress(WRKChainRootContractAddress), common.HexToHash(DepositStorageAddress), nil)
 	depositAmount := big.NewInt(0).SetBytes(deposit)
+	// ToDo: implement ethclient.estimateGas
 	approxGas := uint64(300000)
 
 	totalAmount := big.NewInt(0)
 	totalAmount.Add(depositAmount, big.NewInt(0).SetUint64(approxGas))
 
-	fmt.Printf("depositAmount %v\n", depositAmount.Int64())
-	fmt.Printf("totalAmount %v\n", totalAmount.Int64())
-
 	if balance.Cmp(totalAmount) == -1 {
-		Fatalf("Not enough UND to register\n")
+		Fatalf("Not enough UND to register",
+			"account",
+			ctx.String(AccountUnlockFlag.Name),
+			"balance",
+			balance,
+		)
 	}
 
 	nonce, _ := mainchainClient.NonceAt(ctxBg, thisAccount, nil)
@@ -236,8 +247,6 @@ func regWrkchain(ctx *cli.Context) error {
 	if err != nil {
 		Fatalf("Couldn't get gas price", "err", err)
 	}
-
-	fmt.Printf("gas price: %v\n", gasPrice)
 
 	wrkchainRootSession.TransactOpts.Value = depositAmount
 	wrkchainRootSession.TransactOpts.Nonce = big.NewInt(int64(nonce))
@@ -250,10 +259,11 @@ func regWrkchain(ctx *cli.Context) error {
 		Fatalf("Couldn't register WRKChain", "err", err)
 	}
 
-	fmt.Printf("RegisterWrkChain tx sent: %s\n", tx.Hash().Hex())
+	fmt.Println("RegisterWrkChain tx sent:", tx.Hash().Hex())
 
 	return nil
 }
+
 
 func NewWrkchainRootSession(ctx *cli.Context, bgCtx context.Context) (session wrkchainroot.WRKChainRootSession) {
 	// Grab the password
@@ -298,7 +308,6 @@ func NewWrkchainRootSession(ctx *cli.Context, bgCtx context.Context) (session wr
 	}
 
 	fmt.Printf("auth.From: %v\n", auth.From.Hex())
-	fmt.Printf("auth.Nonce: %v\n", auth.Nonce)
 
 	return wrkchainroot.WRKChainRootSession{
 		TransactOpts: *auth,
