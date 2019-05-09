@@ -20,6 +20,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 )
 
 const (
@@ -46,7 +47,7 @@ The init command initialises the Oracle, creating a secure wallet for running.`,
 	}
 
 	regCommand = cli.Command{
-		Action:    regWrkchain,
+		Action:    registerWrkchain,
 		Name:      "register",
 		Usage:     "Register a WRKChain",
 		ArgsUsage: "",
@@ -61,7 +62,31 @@ The init command initialises the Oracle, creating a secure wallet for running.`,
 		},
 		Category: "ORACLE COMMANDS",
 		Description: `
-The init command initialises the Oracle, creating a secure wallet for running.`,
+The register command registers a new WRKChain on the UND Mainchain`,
+	}
+
+	recCommand = cli.Command{
+		Action:    recordWrkchainBlock,
+		Name:      "record",
+		Usage:     "Record WRKChain Block header hashes",
+		ArgsUsage: "",
+		Flags: []cli.Flag{
+			AccountUnlockFlag,
+			PasswordPathFlag,
+			DataDirectoryFlag,
+			MainchainJsonRpcFlag,
+			UndTestnetFlag,
+			WRKChainJsonRPCFlag,
+			WriteFrequencyFlag,
+			RecordParentHashFlag,
+			RecordReceiptRootFlag,
+			RecordTxRootFlag,
+			RecordStateRootFlag,
+		},
+		Category: "ORACLE COMMANDS",
+		Description: `
+The record command runs the WRKChain Block Heaader Hash recorder and submits WRKChain hashes to Mainchain.
+A WRKChain requires registering first, with the register command`,
 	}
 )
 
@@ -126,7 +151,7 @@ func initOracle(ctx *cli.Context) error {
 	return nil
 }
 
-func regWrkchain(ctx *cli.Context) error {
+func registerWrkchain(ctx *cli.Context) error {
 
 	fmt.Println()
 	ctxBg := context.Background()
@@ -264,6 +289,172 @@ func regWrkchain(ctx *cli.Context) error {
 	return nil
 }
 
+func recordWrkchainBlock(ctx *cli.Context) error {
+
+	fmt.Println()
+	ctxBg := context.Background()
+	MkDataDir(ctx.String(DataDirectoryFlag.Name))
+
+	if !ctx.IsSet(WRKChainJsonRPCFlag.Name) {
+		Fatalf("WRKChainJsonRPCFlag not set")
+	}
+
+	// Create a new WRKChainRoot Session
+	wrkchainRootSession := NewWrkchainRootSession(ctx, ctxBg)
+
+	thisAccount := common.HexToAddress(strings.TrimSpace(ctx.String(AccountUnlockFlag.Name)))
+
+	// Connect
+	fmt.Println("Connecting to Mainchain JSON RPC on", ctx.String(MainchainJsonRpcFlag.Name))
+	mainchainClient, err := ethclient.Dial(strings.TrimSpace(ctx.String(MainchainJsonRpcFlag.Name)))
+	if err != nil {
+		Fatalf("Couldn't connect to Mainchain", "err", err)
+	}
+
+	wrkchainRootSession = LoadContract(wrkchainRootSession, mainchainClient)
+
+	fmt.Println("Connecting to WRKChain JSON RPC on", ctx.String(WRKChainJsonRPCFlag.Name))
+	wrkChainClient, err := ethclient.Dial(strings.TrimSpace(ctx.String(WRKChainJsonRPCFlag.Name)))
+
+	wrkchainNetworkId, err := wrkChainClient.NetworkID(ctxBg)
+
+	if err != nil {
+		Fatalf("Could not get WRKChain Network ID: ", err)
+	}
+
+	pollWrkchain(ctx, mainchainClient, &wrkchainRootSession, wrkChainClient, wrkchainNetworkId, thisAccount)
+
+	return nil
+}
+
+func pollWrkchain(
+	ctx *cli.Context,
+	mainchainClient *ethclient.Client,
+	wrkchainRootSession *wrkchainroot.WRKChainRootSession,
+	wrkChainClient *ethclient.Client,
+	wrkchainNetworkId *big.Int,
+	thisAccount common.Address,
+) {
+
+	fmt.Println("Start Polling")
+
+	frequency := ctx.Int64(WriteFrequencyFlag.Name)
+
+	approxGas := uint64(300000)
+
+	for {
+
+		// get UND Balance
+		balance, _ := mainchainClient.BalanceAt(context.Background(), thisAccount, nil)
+
+		// ToDo: output balance in UND
+		fmt.Println("Balance for", thisAccount.Hex(), balance)
+
+		if balance.Cmp(big.NewInt(0).SetUint64(approxGas)) == -1 {
+			Fatalf("Not enough UND to record",
+				"account",
+				ctx.String(AccountUnlockFlag.Name),
+				"balance",
+				balance,
+			)
+		}
+
+		nonce, _ := mainchainClient.NonceAt(context.Background(), thisAccount, nil)
+		gasPrice, err := mainchainClient.SuggestGasPrice(context.Background())
+
+		latestWrkchainHeader, err := wrkChainClient.HeaderByNumber(context.Background(), nil)
+
+		if err != nil {
+			Fatalf("Could not get latest WRKChain Block: ", err)
+		}
+
+		blockHash := latestWrkchainHeader.Hash()
+		parentHash := [32]byte{0}
+		receiptHash := [32]byte{0}
+		txHash := [32]byte{0}
+		rootHash := [32]byte{0}
+		blockHeight := latestWrkchainHeader.Number
+
+		if ctx.IsSet(RecordParentHashFlag.Name) {
+			parentHash = latestWrkchainHeader.ParentHash
+		}
+
+		if ctx.IsSet(RecordReceiptRootFlag.Name) {
+			receiptHash = latestWrkchainHeader.ReceiptHash
+		}
+
+		if ctx.IsSet(RecordTxRootFlag.Name) {
+			txHash = latestWrkchainHeader.TxHash
+		}
+
+		if ctx.IsSet(RecordStateRootFlag.Name) {
+			rootHash = latestWrkchainHeader.Root
+		}
+		go record(
+			wrkchainRootSession,
+			wrkchainNetworkId,
+			blockHeight,
+			blockHash,
+			parentHash,
+			receiptHash,
+			txHash,
+			rootHash,
+			thisAccount,
+			frequency,
+			nonce,
+			gasPrice,
+			approxGas)
+
+		<-time.After(time.Duration(frequency) * time.Second)
+	}
+
+}
+
+func record(
+	wrkchainRootSession *wrkchainroot.WRKChainRootSession,
+	wrkchainNetworkId *big.Int,
+	blockHeight *big.Int,
+	blockHash [32]byte,
+	parentHash [32]byte,
+	receiptHash [32]byte,
+	txHash [32]byte,
+	rootHash [32]byte,
+	sealer common.Address,
+	frequency int64,
+	nonce uint64,
+	gasPrice *big.Int,
+	approxGas uint64) {
+
+	fmt.Println("WRKChain Network ID:", wrkchainNetworkId)
+	fmt.Println("blockHeight", blockHeight)
+	fmt.Println("blockHash", common.ToHex(blockHash[:]))
+	fmt.Println("parentHash", common.ToHex(parentHash[:]))
+	fmt.Println("receiptHash", common.ToHex(receiptHash[:]))
+	fmt.Println("txHash", common.ToHex(txHash[:]))
+	fmt.Println("rootHash", common.ToHex(rootHash[:]))
+	fmt.Println("sealer", sealer.Hex())
+
+	fmt.Println("Sending Tx to WRKChain Root on Mainchain")
+
+	wrkchainRootSession.TransactOpts.Value = big.NewInt(0)
+	wrkchainRootSession.TransactOpts.Nonce = big.NewInt(int64(nonce))
+	wrkchainRootSession.TransactOpts.GasLimit = approxGas
+	wrkchainRootSession.TransactOpts.GasPrice = gasPrice
+
+	tx, err := wrkchainRootSession.RecordHeader(wrkchainNetworkId, blockHeight, blockHash, parentHash, receiptHash, txHash, rootHash, sealer)
+
+	if err != nil {
+		Fatalf("Could not record WRKChain Header:", err)
+	}
+
+	fmt.Println("RecordHeader tx sent:", tx.Hash().Hex())
+
+	// ToDo: Check tx receipt for success/failure and report
+
+	fmt.Println("Waiting for", frequency, "seconds")
+	fmt.Println("-------------------------------------")
+
+}
 
 func NewWrkchainRootSession(ctx *cli.Context, bgCtx context.Context) (session wrkchainroot.WRKChainRootSession) {
 	// Grab the password
@@ -329,4 +520,3 @@ func LoadContract(session wrkchainroot.WRKChainRootSession, client *ethclient.Cl
 	session.Contract = instance
 	return session
 }
-
