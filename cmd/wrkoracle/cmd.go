@@ -191,6 +191,7 @@ func registerWrkchain(ctx *cli.Context) error {
 	thisAccount := common.HexToAddress(strings.TrimSpace(ctx.String(AccountUnlockFlag.Name)))
 
 	// add this account by default
+	fmt.Println("Adding default authorised address:", thisAccount.Hex())
 	authAddresses := []common.Address{thisAccount}
 
 	addressParts := strings.Split(strings.TrimSpace(ctx.String(AuthorisedAccountsFlag.Name)), ",")
@@ -200,7 +201,11 @@ func registerWrkchain(ctx *cli.Context) error {
 		if !common.IsHexAddress(authAddr) {
 			Fatalf("Invalid address", authAddr)
 		}
-		authAddresses = append(authAddresses, common.StringToAddress(authAddr))
+		authAddr := common.HexToAddress(authAddr)
+		if authAddr != thisAccount {
+			fmt.Println("Adding authorised address:", authAddr.Hex())
+			authAddresses = append(authAddresses, authAddr)
+		}
 	}
 
 	if len(authAddresses) == 0 {
