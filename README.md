@@ -18,7 +18,7 @@ go get github.com/unification-com/mainchain
 
 ```bash
 go get github.com/unification-com/oracle
-go install github.com/unification-com/oracle
+go install github.com/unification-com/oracle/cmd/wrkoracle
 ```
 
 4. Check it installed OK:
