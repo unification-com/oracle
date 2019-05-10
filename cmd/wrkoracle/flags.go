@@ -10,7 +10,6 @@ import (
 	"strings"
 )
 
-
 var (
 	CommandHelpTemplate = `{{.cmd.Name}}{{if .cmd.Subcommands}} command{{end}}{{if .cmd.Flags}} [command options]{{end}} [arguments...]
 {{if .cmd.Description}}{{.cmd.Description}}
@@ -92,7 +91,7 @@ var (
 	}
 
 	// WRKChain flags
-	WRKChainJsonRPCFlag  = cli.StringFlag{
+	WRKChainJsonRPCFlag = cli.StringFlag{
 		Name:  "wrkchain.rpc",
 		Usage: "URI for the WRKChain's JSON RPC API, e.g. http://localhost:8101",
 	}
@@ -102,23 +101,22 @@ var (
 		Value: 3600,
 	}
 	RecordParentHashFlag = cli.BoolFlag{
-		Name: "hash.parent",
+		Name:  "hash.parent",
 		Usage: "If set, WRKChain Oracle will submit the WRKChain's parent hash",
 	}
 	RecordReceiptRootFlag = cli.BoolFlag{
-		Name: "hash.receipt",
+		Name:  "hash.receipt",
 		Usage: "If set, WRKChain Oracle will submit the WRKChain's Receipt Root hash",
 	}
 	RecordTxRootFlag = cli.BoolFlag{
-		Name: "hash.tx",
+		Name:  "hash.tx",
 		Usage: "If set, WRKChain Oracle will submit the WRKChain's Tx Root hash",
 	}
 	RecordStateRootFlag = cli.BoolFlag{
-		Name: "hash.state",
+		Name:  "hash.state",
 		Usage: "If set, WRKChain Oracle will submit the WRKChain's State Root hash",
 	}
 )
-
 
 // Custom type which is registered in the flags library which cli uses for
 // argument parsing. This allows us to expand Value to an absolute path when
@@ -159,7 +157,6 @@ func (self DirectoryFlag) GetName() string {
 func (self *DirectoryFlag) Set(value string) {
 	self.Value.Value = value
 }
-
 
 func eachName(longName string, fn func(string)) {
 	parts := strings.Split(longName, ",")

@@ -158,7 +158,7 @@ func registerWrkchain(ctx *cli.Context) error {
 	MkDataDir(ctx.String(DataDirectoryFlag.Name))
 
 	// Process Genesis. Note - only geth based genesis blocks supported at this time
-	if ! ctx.IsSet(GenesisPathFlag.Name) {
+	if !ctx.IsSet(GenesisPathFlag.Name) {
 		Fatalf("Path to genesis JSON file required")
 	}
 	file, err := os.Open(strings.TrimSpace(ctx.String(GenesisPathFlag.Name)))
@@ -184,7 +184,7 @@ func registerWrkchain(ctx *cli.Context) error {
 	fmt.Println("WRKChain Network ID:", wrkchainNetworkId)
 
 	// Process authorised addresses
-	if ! ctx.IsSet(AuthorisedAccountsFlag.Name) {
+	if !ctx.IsSet(AuthorisedAccountsFlag.Name) {
 		Fatalf("List of Authorised addresses required required")
 	}
 
