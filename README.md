@@ -107,7 +107,7 @@ wrkoracle register --password ~/.wrkchain_oracle/.password --account [oracle_wal
 for example:
 
 ```bash
-wrkoracle register --password ~/.und_mainchain/.password --account 0x160b51e66e51327ac31c643f7675b8a9006aee1e --genesis ./test/wrkchain.genesis.test.json --auth 0x160B51e66e51327ac31C643f7675B8A9006aEE1E,0xbEc4127468c51fF89719DBcA5DC57F39C0049f06 --mainchain.rpc "http://172.25.0.5:8101"
+wrkoracle register --password ~/.und_mainchain/.password --account 0x160b51e66e51327ac31c643f7675b8a9006aee1e --genesis ./test/wrkchain.genesis.test.json --auth 0x160B51e66e51327ac31C643f7675B8A9006aEE1E,0xbEc4127468c51fF89719DBcA5DC57F39C0049f06 --mainchain.rpc "http://67.231.18.141:8101"
 ```
 
 You should see output similer to the following:
@@ -152,7 +152,7 @@ wrkoracle record --password ~/.und_mainchain/.password --account [oracle_wallet_
 For example:
 
 ```bash
-wrkoracle record --password ~/.und_mainchain/.password --account 0x160b51e66e51327ac31c643f7675b8a9006aee1e --mainchain.rpc "http://172.25.0.5:8101" --wrkchain.rpc "http://172.25.0.5:8101" --hash.parent --hash.receipt --hash.tx --hash.state --freq 60
+wrkoracle record --password ~/.und_mainchain/.password --account 0x160b51e66e51327ac31c643f7675b8a9006aee1e --mainchain.rpc "http://67.231.18.141:8101" --wrkchain.rpc "http://172.25.0.5:8101" --hash.parent --hash.receipt --hash.tx --hash.state --freq 60
 ```
 
 You should begin to see output similar to:
