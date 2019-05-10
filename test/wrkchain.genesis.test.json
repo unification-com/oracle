@@ -1,6 +1,6 @@
 {
   "config": {
-    "chainId": 50002,
+    "chainId": 50009,
     "homesteadBlock": 1,
     "eip150Block": 2,
     "eip150Hash": "0x0000000000000000000000000000000000000000000000000000000000000000",
@@ -8,7 +8,7 @@
     "eip158Block": 3,
     "byzantiumBlock": 4,
     "constantinopleBlock": 5,
-    "poaund": {
+    "clique": {
       "period": 5,
       "epoch": 30000
     }

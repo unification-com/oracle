@@ -14,3 +14,9 @@
 
 # Jetbrains IDEs
 .idea*
+
+# Dependency directories (remove the comment below to include it)
+vendor/
+
+# Binary when running go build ./cmd/oracle
+/wrkoracle
