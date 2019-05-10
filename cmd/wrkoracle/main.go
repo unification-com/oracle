@@ -40,8 +40,8 @@ var (
 
 func init() {
 
-	app.Action = oracle
-	app.Name = "oracle"
+	app.Action = wrkoracle
+	app.Name = "wrkoracle"
 	app.Author = "Unification Foundation"
 	app.Email = "hello@unification.com"
 	app.Usage = "WRKChain Oracle - registers a WRKCHain on UND Mainchain, and records a WRKChain's hashes on Mainchain"
@@ -71,8 +71,8 @@ func main() {
 	}
 }
 
-func oracle(ctx *cli.Context) error {
+func wrkoracle(ctx *cli.Context) error {
 	fmt.Println("RUN FOR THE HILLS!")
-	fmt.Println("Or just run 'oracle help'")
+	fmt.Println("Or just run 'wrkoracle help'")
 	return nil
 }

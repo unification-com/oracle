@@ -139,7 +139,7 @@ func initOracle(ctx *cli.Context) error {
 	if !ks.HasAddress(account) {
 		_, err = ks.ImportECDSA(privateKey, pass)
 		if err != nil {
-			Fatalf("Failed to import oracle signer account", "err", err)
+			Fatalf("Failed to import Oracle signer account", "err", err)
 		}
 
 		fmt.Printf("Account %v created. You can now delete %v\n", account.Hex(), ctx.String(PrivateKeyPathFlag.Name))

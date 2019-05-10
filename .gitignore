@@ -19,4 +19,4 @@
 vendor/
 
 # Binary when running go build ./cmd/oracle
-/oracle
+/wrkoracle
