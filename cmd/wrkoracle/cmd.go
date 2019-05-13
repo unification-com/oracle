@@ -259,7 +259,7 @@ func registerWrkchain(ctx *cli.Context) error {
 
 	// gather up params for registering WRKChain
 	// Required deposit amount held in first storage value in WRKChain Root contract
-	deposit, err := mainchainClient.StorageAt(ctxBg, common.HexToAddress(WRKChainRootContractAddress), common.HexToHash(DepositStorageAddress), nil)
+	deposit, _ := mainchainClient.StorageAt(ctxBg, common.HexToAddress(WRKChainRootContractAddress), common.HexToHash(DepositStorageAddress), nil)
 	depositAmount := big.NewInt(0).SetBytes(deposit)
 	// ToDo: implement ethclient.estimateGas
 	approxGas := uint64(300000)
@@ -325,7 +325,7 @@ func recordWrkchainBlock(ctx *cli.Context) error {
 	wrkchainRootSession = LoadContract(wrkchainRootSession, mainchainClient)
 
 	fmt.Println("Connecting to WRKChain JSON RPC on", ctx.String(WRKChainJSONRPCFlag.Name))
-	wrkChainClient, err := ethclient.Dial(strings.TrimSpace(ctx.String(WRKChainJSONRPCFlag.Name)))
+	wrkChainClient, _ := ethclient.Dial(strings.TrimSpace(ctx.String(WRKChainJSONRPCFlag.Name)))
 
 	wrkchainNetworkID, err := wrkChainClient.NetworkID(ctxBg)
 
@@ -371,7 +371,7 @@ func pollWrkchain(
 		}
 
 		nonce, _ := mainchainClient.NonceAt(context.Background(), thisAccount, nil)
-		gasPrice, err := mainchainClient.SuggestGasPrice(context.Background())
+		gasPrice, _ := mainchainClient.SuggestGasPrice(context.Background())
 
 		latestWrkchainHeader, err := wrkChainClient.HeaderByNumber(context.Background(), nil)
 
