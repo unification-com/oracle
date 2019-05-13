@@ -8,7 +8,6 @@ import (
 )
 
 var (
-
 	app = cli.NewApp()
 
 	commonFlags = []cli.Flag{
@@ -17,18 +16,18 @@ var (
 		MainchainJsonRpcFlag,
 	}
 
-    regFlags = []cli.Flag{
+	regFlags = []cli.Flag{
 		GenesisPathFlag,
 		AuthorisedAccountsFlag,
-    }
+	}
 
-    accFlags = []cli.Flag{
+	accFlags = []cli.Flag{
 		PasswordPathFlag,
 		PrivateKeyPathFlag,
 		AccountUnlockFlag,
 	}
 
-    wrkchainFlags = []cli.Flag{
+	wrkchainFlags = []cli.Flag{
 		WRKChainJsonRPCFlag,
 		WriteFrequencyFlag,
 		RecordParentHashFlag,
