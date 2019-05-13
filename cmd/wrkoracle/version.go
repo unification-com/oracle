@@ -2,11 +2,17 @@ package main
 
 import "fmt"
 
+/*
+VersionMajor: Major version component of the current release
+VersionMinor: Minor version component of the current release
+VersionPatch: Patch version component of the current release
+VersionMeta : Version metadata to append to the version string
+ */
 const (
-	VersionMajor = 0       // Major version component of the current release
-	VersionMinor = 3       // Minor version component of the current release
-	VersionPatch = 0       // Patch version component of the current release
-	VersionMeta  = "alpha" // Version metadata to append to the version string
+	VersionMajor = 0
+	VersionMinor = 3
+	VersionPatch = 0
+	VersionMeta  = "alpha"
 )
 
 // Version holds the textual version string.

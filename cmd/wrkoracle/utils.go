@@ -47,6 +47,7 @@ func Fatalf(format string, args ...interface{}) {
 	os.Exit(1)
 }
 
+// MkDataDir calls the OS mkdir command to created the directory path
 func MkDataDir(dirPath string) {
 	if err := os.MkdirAll(dirPath, 0700); err != nil {
 		Fatalf("Could not create datadir", "datadir", dirPath, "err", err)

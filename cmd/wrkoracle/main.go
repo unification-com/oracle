@@ -13,7 +13,7 @@ var (
 	commonFlags = []cli.Flag{
 		DataDirectoryFlag,
 		UndTestnetFlag,
-		MainchainJsonRpcFlag,
+		MainchainJSONRPCFlag,
 	}
 
 	regFlags = []cli.Flag{
@@ -28,7 +28,7 @@ var (
 	}
 
 	wrkchainFlags = []cli.Flag{
-		WRKChainJsonRPCFlag,
+		WRKChainJSONRPCFlag,
 		WriteFrequencyFlag,
 		RecordParentHashFlag,
 		RecordReceiptRootFlag,
