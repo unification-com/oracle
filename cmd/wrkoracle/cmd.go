@@ -16,6 +16,7 @@ import (
 	"github.com/unification-com/mainchain/ethclient"
 	"gopkg.in/urfave/cli.v1"
 	"io/ioutil"
+	"math"
 	"math/big"
 	"os"
 	"path/filepath"
@@ -229,8 +230,10 @@ func registerWrkchain(ctx *cli.Context) error {
 	}
 
 	balance, _ := mainchainClient.BalanceAt(ctxBg, thisAccount, nil)
-	// ToDo: output balance in UND
-	fmt.Println("Balance for", ctx.String(AccountUnlockFlag.Name), balance)
+	balanceFloat := new(big.Float)
+	balanceFloat.SetString(balance.String())
+	undValue := new(big.Float).Quo(balanceFloat, big.NewFloat(math.Pow10(18)))
+	fmt.Println("Balance for", ctx.String(AccountUnlockFlag.Name), undValue, "UND")
 
 	wrkchainRootSession = LoadContract(wrkchainRootSession, mainchainClient)
 
@@ -272,7 +275,8 @@ func registerWrkchain(ctx *cli.Context) error {
 			"account",
 			ctx.String(AccountUnlockFlag.Name),
 			"balance",
-			balance,
+			undValue.String(),
+			"UND",
 		)
 	}
 
@@ -358,15 +362,18 @@ func pollWrkchain(
 		// get UND Balance
 		balance, _ := mainchainClient.BalanceAt(context.Background(), thisAccount, nil)
 
-		// ToDo: output balance in UND
-		fmt.Println("Balance for", thisAccount.Hex(), balance)
+		balanceFloat := new(big.Float)
+		balanceFloat.SetString(balance.String())
+		undValue := new(big.Float).Quo(balanceFloat, big.NewFloat(math.Pow10(18)))
+		fmt.Println("Balance for", thisAccount.Hex(), undValue, "UND")
 
 		if balance.Cmp(big.NewInt(0).SetUint64(approxGas)) == -1 {
 			Fatalf("Not enough UND to record",
 				"account",
 				ctx.String(AccountUnlockFlag.Name),
 				"balance",
-				balance,
+				undValue.String(),
+				"UND",
 			)
 		}
 
