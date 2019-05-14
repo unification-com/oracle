@@ -12,7 +12,7 @@ import (
 
 /*
 CommandHelpTemplate: Template for help output
- */
+*/
 var (
 	CommandHelpTemplate = `{{.cmd.Name}}{{if .cmd.Subcommands}} command{{end}}{{if .cmd.Flags}} [command options]{{end}} [arguments...]
 {{if .cmd.Description}}{{.cmd.Description}}

@@ -29,7 +29,7 @@ WRKChainRootContractAddress: Contract address, hard-coded into Mainchain's genes
 DepositStorageAddress: Storage address in WRKChain Root contract contaiing the required UND deposit amount, in wei
 DefaultMainchainTestnetRPC: Default UND Mainchain JSON RPC URL for testnet
 DefaultMainchainMainnetRPC: Default UND Mainchain JSON RPC URL for maainnet
- */
+*/
 const (
 	WRKChainRootContractAddress = "0x0000000000000000000000000000000000000087"
 	DepositStorageAddress       = "0x0000000000000000000000000000000000000000000000000000000000000000"
@@ -529,7 +529,6 @@ func NewWrkchainRootSession(bgCtx context.Context, ctx *cli.Context) (session wr
 	}
 
 }
-
 
 // LoadContract Load the WRKChain Root smart contract into the WRKChain Root Session
 func LoadContract(session wrkchainroot.WRKChainRootSession, client *ethclient.Client) wrkchainroot.WRKChainRootSession {

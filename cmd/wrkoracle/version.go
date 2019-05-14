@@ -7,7 +7,7 @@ VersionMajor: Major version component of the current release
 VersionMinor: Minor version component of the current release
 VersionPatch: Patch version component of the current release
 VersionMeta : Version metadata to append to the version string
- */
+*/
 const (
 	VersionMajor = 0
 	VersionMinor = 3
