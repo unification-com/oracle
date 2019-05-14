@@ -1,5 +1,6 @@
 # WRKChain Oracle
 
+[![Go Report Card](https://goreportcard.com/badge/github.com/unification-com/oracle)](https://goreportcard.com/report/github.com/unification-com/oracle)
 [![Join the chat at https://gitter.im/unification-com/oracle](https://badges.gitter.im/unification-com/oracle.svg)](https://gitter.im/unification-com/oracle?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
 
 WRKChain Oracle allows WRKChain developers to register their WRKChains and submit

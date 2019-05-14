@@ -16,6 +16,7 @@ import (
 	"github.com/unification-com/mainchain/ethclient"
 	"gopkg.in/urfave/cli.v1"
 	"io/ioutil"
+	"math"
 	"math/big"
 	"os"
 	"path/filepath"
@@ -23,6 +24,12 @@ import (
 	"time"
 )
 
+/*
+WRKChainRootContractAddress: Contract address, hard-coded into Mainchain's genesis block
+DepositStorageAddress: Storage address in WRKChain Root contract contaiing the required UND deposit amount, in wei
+DefaultMainchainTestnetRPC: Default UND Mainchain JSON RPC URL for testnet
+DefaultMainchainMainnetRPC: Default UND Mainchain JSON RPC URL for maainnet
+ */
 const (
 	WRKChainRootContractAddress = "0x0000000000000000000000000000000000000087"
 	DepositStorageAddress       = "0x0000000000000000000000000000000000000000000000000000000000000000"
@@ -57,7 +64,7 @@ The init command initialises the Oracle, creating a secure wallet for running.`,
 			DataDirectoryFlag,
 			GenesisPathFlag,
 			AuthorisedAccountsFlag,
-			MainchainJsonRpcFlag,
+			MainchainJSONRPCFlag,
 			UndTestnetFlag,
 		},
 		Category: "ORACLE COMMANDS",
@@ -74,9 +81,9 @@ The register command registers a new WRKChain on the UND Mainchain`,
 			AccountUnlockFlag,
 			PasswordPathFlag,
 			DataDirectoryFlag,
-			MainchainJsonRpcFlag,
+			MainchainJSONRPCFlag,
 			UndTestnetFlag,
-			WRKChainJsonRPCFlag,
+			WRKChainJSONRPCFlag,
 			WriteFrequencyFlag,
 			RecordParentHashFlag,
 			RecordReceiptRootFlag,
@@ -177,11 +184,11 @@ func registerWrkchain(ctx *cli.Context) error {
 	block := genesis.ToBlock(nil)
 
 	genesisHash := block.Hash()
-	wrkchainNetworkId := genesis.Config.ChainId
+	wrkchainNetworkID := genesis.Config.ChainId
 
 	fmt.Println("Registering WRKChain with:")
 	fmt.Println("WRKChain Genesis Hash:", genesisHash.Hex())
-	fmt.Println("WRKChain Network ID:", wrkchainNetworkId)
+	fmt.Println("WRKChain Network ID:", wrkchainNetworkID)
 
 	// Process authorised addresses
 	if !ctx.IsSet(AuthorisedAccountsFlag.Name) {
@@ -213,18 +220,20 @@ func registerWrkchain(ctx *cli.Context) error {
 	}
 
 	// Create a new WRKChainRoot Session
-	wrkchainRootSession := NewWrkchainRootSession(ctx, ctxBg)
+	wrkchainRootSession := NewWrkchainRootSession(ctxBg, ctx)
 
 	// Connect
-	fmt.Println("Connecting to Mainchain JSON RPC on", ctx.String(MainchainJsonRpcFlag.Name))
-	mainchainClient, err := ethclient.Dial(strings.TrimSpace(ctx.String(MainchainJsonRpcFlag.Name)))
+	fmt.Println("Connecting to Mainchain JSON RPC on", ctx.String(MainchainJSONRPCFlag.Name))
+	mainchainClient, err := ethclient.Dial(strings.TrimSpace(ctx.String(MainchainJSONRPCFlag.Name)))
 	if err != nil {
 		Fatalf("Couldn't connect to Mainchain", "err", err)
 	}
 
 	balance, _ := mainchainClient.BalanceAt(ctxBg, thisAccount, nil)
-	// ToDo: output balance in UND
-	fmt.Println("Balance for", ctx.String(AccountUnlockFlag.Name), balance)
+	balanceFloat := new(big.Float)
+	balanceFloat.SetString(balance.String())
+	undValue := new(big.Float).Quo(balanceFloat, big.NewFloat(math.Pow10(18)))
+	fmt.Println("Balance for", ctx.String(AccountUnlockFlag.Name), undValue, "UND")
 
 	wrkchainRootSession = LoadContract(wrkchainRootSession, mainchainClient)
 
@@ -234,10 +243,10 @@ func registerWrkchain(ctx *cli.Context) error {
 	filterOpts.End = nil
 	filterOpts.Context = ctxBg
 
-	wrkchainIdFilterList := make([]*big.Int, 0)
-	wrkchainIdFilterList = append(wrkchainIdFilterList, wrkchainNetworkId)
+	wrkchainIDFilterList := make([]*big.Int, 0)
+	wrkchainIDFilterList = append(wrkchainIDFilterList, wrkchainNetworkID)
 
-	registerWrkChainEvents, err := wrkchainRootSession.Contract.FilterRegisterWrkChain(filterOpts, wrkchainIdFilterList)
+	registerWrkChainEvents, err := wrkchainRootSession.Contract.FilterRegisterWrkChain(filterOpts, wrkchainIDFilterList)
 	if err != nil {
 		Fatalf("failed to filter for RegisterWrkChain events:", "err", err)
 	}
@@ -253,7 +262,7 @@ func registerWrkchain(ctx *cli.Context) error {
 
 	// gather up params for registering WRKChain
 	// Required deposit amount held in first storage value in WRKChain Root contract
-	deposit, err := mainchainClient.StorageAt(ctxBg, common.HexToAddress(WRKChainRootContractAddress), common.HexToHash(DepositStorageAddress), nil)
+	deposit, _ := mainchainClient.StorageAt(ctxBg, common.HexToAddress(WRKChainRootContractAddress), common.HexToHash(DepositStorageAddress), nil)
 	depositAmount := big.NewInt(0).SetBytes(deposit)
 	// ToDo: implement ethclient.estimateGas
 	approxGas := uint64(300000)
@@ -266,7 +275,8 @@ func registerWrkchain(ctx *cli.Context) error {
 			"account",
 			ctx.String(AccountUnlockFlag.Name),
 			"balance",
-			balance,
+			undValue.String(),
+			"UND",
 		)
 	}
 
@@ -283,7 +293,7 @@ func registerWrkchain(ctx *cli.Context) error {
 	wrkchainRootSession.TransactOpts.GasLimit = approxGas
 	wrkchainRootSession.TransactOpts.GasPrice = gasPrice
 
-	tx, err := wrkchainRootSession.RegisterWrkChain(wrkchainNetworkId, authAddresses, genesisHash)
+	tx, err := wrkchainRootSession.RegisterWrkChain(wrkchainNetworkID, authAddresses, genesisHash)
 
 	if err != nil {
 		Fatalf("Couldn't register WRKChain", "err", err)
@@ -300,34 +310,34 @@ func recordWrkchainBlock(ctx *cli.Context) error {
 	ctxBg := context.Background()
 	MkDataDir(ctx.String(DataDirectoryFlag.Name))
 
-	if !ctx.IsSet(WRKChainJsonRPCFlag.Name) {
-		Fatalf("WRKChainJsonRPCFlag not set")
+	if !ctx.IsSet(WRKChainJSONRPCFlag.Name) {
+		Fatalf("WRKChainJSONRPCFlag not set")
 	}
 
 	// Create a new WRKChainRoot Session
-	wrkchainRootSession := NewWrkchainRootSession(ctx, ctxBg)
+	wrkchainRootSession := NewWrkchainRootSession(ctxBg, ctx)
 
 	thisAccount := common.HexToAddress(strings.TrimSpace(ctx.String(AccountUnlockFlag.Name)))
 
 	// Connect
-	fmt.Println("Connecting to Mainchain JSON RPC on", ctx.String(MainchainJsonRpcFlag.Name))
-	mainchainClient, err := ethclient.Dial(strings.TrimSpace(ctx.String(MainchainJsonRpcFlag.Name)))
+	fmt.Println("Connecting to Mainchain JSON RPC on", ctx.String(MainchainJSONRPCFlag.Name))
+	mainchainClient, err := ethclient.Dial(strings.TrimSpace(ctx.String(MainchainJSONRPCFlag.Name)))
 	if err != nil {
 		Fatalf("Couldn't connect to Mainchain", "err", err)
 	}
 
 	wrkchainRootSession = LoadContract(wrkchainRootSession, mainchainClient)
 
-	fmt.Println("Connecting to WRKChain JSON RPC on", ctx.String(WRKChainJsonRPCFlag.Name))
-	wrkChainClient, err := ethclient.Dial(strings.TrimSpace(ctx.String(WRKChainJsonRPCFlag.Name)))
+	fmt.Println("Connecting to WRKChain JSON RPC on", ctx.String(WRKChainJSONRPCFlag.Name))
+	wrkChainClient, _ := ethclient.Dial(strings.TrimSpace(ctx.String(WRKChainJSONRPCFlag.Name)))
 
-	wrkchainNetworkId, err := wrkChainClient.NetworkID(ctxBg)
+	wrkchainNetworkID, err := wrkChainClient.NetworkID(ctxBg)
 
 	if err != nil {
 		Fatalf("Could not get WRKChain Network ID: ", err)
 	}
 
-	pollWrkchain(ctx, mainchainClient, &wrkchainRootSession, wrkChainClient, wrkchainNetworkId, thisAccount)
+	pollWrkchain(ctx, mainchainClient, &wrkchainRootSession, wrkChainClient, wrkchainNetworkID, thisAccount)
 
 	return nil
 }
@@ -337,7 +347,7 @@ func pollWrkchain(
 	mainchainClient *ethclient.Client,
 	wrkchainRootSession *wrkchainroot.WRKChainRootSession,
 	wrkChainClient *ethclient.Client,
-	wrkchainNetworkId *big.Int,
+	wrkchainNetworkID *big.Int,
 	thisAccount common.Address,
 ) {
 
@@ -352,20 +362,23 @@ func pollWrkchain(
 		// get UND Balance
 		balance, _ := mainchainClient.BalanceAt(context.Background(), thisAccount, nil)
 
-		// ToDo: output balance in UND
-		fmt.Println("Balance for", thisAccount.Hex(), balance)
+		balanceFloat := new(big.Float)
+		balanceFloat.SetString(balance.String())
+		undValue := new(big.Float).Quo(balanceFloat, big.NewFloat(math.Pow10(18)))
+		fmt.Println("Balance for", thisAccount.Hex(), undValue, "UND")
 
 		if balance.Cmp(big.NewInt(0).SetUint64(approxGas)) == -1 {
 			Fatalf("Not enough UND to record",
 				"account",
 				ctx.String(AccountUnlockFlag.Name),
 				"balance",
-				balance,
+				undValue.String(),
+				"UND",
 			)
 		}
 
 		nonce, _ := mainchainClient.NonceAt(context.Background(), thisAccount, nil)
-		gasPrice, err := mainchainClient.SuggestGasPrice(context.Background())
+		gasPrice, _ := mainchainClient.SuggestGasPrice(context.Background())
 
 		latestWrkchainHeader, err := wrkChainClient.HeaderByNumber(context.Background(), nil)
 
@@ -397,7 +410,7 @@ func pollWrkchain(
 		}
 		go record(
 			wrkchainRootSession,
-			wrkchainNetworkId,
+			wrkchainNetworkID,
 			blockHeight,
 			blockHash,
 			parentHash,
@@ -417,7 +430,7 @@ func pollWrkchain(
 
 func record(
 	wrkchainRootSession *wrkchainroot.WRKChainRootSession,
-	wrkchainNetworkId *big.Int,
+	wrkchainNetworkID *big.Int,
 	blockHeight *big.Int,
 	blockHash [32]byte,
 	parentHash [32]byte,
@@ -430,7 +443,7 @@ func record(
 	gasPrice *big.Int,
 	approxGas uint64) {
 
-	fmt.Println("WRKChain Network ID:", wrkchainNetworkId)
+	fmt.Println("WRKChain Network ID:", wrkchainNetworkID)
 	fmt.Println("blockHeight", blockHeight)
 	fmt.Println("blockHash", common.ToHex(blockHash[:]))
 	fmt.Println("parentHash", common.ToHex(parentHash[:]))
@@ -446,7 +459,7 @@ func record(
 	wrkchainRootSession.TransactOpts.GasLimit = approxGas
 	wrkchainRootSession.TransactOpts.GasPrice = gasPrice
 
-	tx, err := wrkchainRootSession.RecordHeader(wrkchainNetworkId, blockHeight, blockHash, parentHash, receiptHash, txHash, rootHash, sealer)
+	tx, err := wrkchainRootSession.RecordHeader(wrkchainNetworkID, blockHeight, blockHash, parentHash, receiptHash, txHash, rootHash, sealer)
 
 	if err != nil {
 		Fatalf("Could not record WRKChain Header:", err)
@@ -461,7 +474,8 @@ func record(
 
 }
 
-func NewWrkchainRootSession(ctx *cli.Context, bgCtx context.Context) (session wrkchainroot.WRKChainRootSession) {
+// NewWrkchainRootSession Create a new session for the WRKChain Root smart contract
+func NewWrkchainRootSession(bgCtx context.Context, ctx *cli.Context) (session wrkchainroot.WRKChainRootSession) {
 	// Grab the password
 	if !ctx.IsSet(PasswordPathFlag.Name) {
 		Fatalf("Path to password file required")
@@ -516,6 +530,8 @@ func NewWrkchainRootSession(ctx *cli.Context, bgCtx context.Context) (session wr
 
 }
 
+
+// LoadContract Load the WRKChain Root smart contract into the WRKChain Root Session
 func LoadContract(session wrkchainroot.WRKChainRootSession, client *ethclient.Client) wrkchainroot.WRKChainRootSession {
 	addr := common.HexToAddress(WRKChainRootContractAddress)
 	instance, err := wrkchainroot.NewWRKChainRoot(addr, client)
