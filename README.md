@@ -10,18 +10,17 @@ block header hashes to the Unification Mainchain.
 
 1. Install Golang - https://golang.org/doc/install
 
-2. Download the dependencies:
+2. Clone the repo:
 
 ```bash
-go get gopkg.in/urfave/cli.v1
-go get github.com/unification-com/mainchain
+git clone https://github.com/unification-com/oracle
 ```
 
-3. Grab the WRKChain Oracle
+3. Install the `wrkoracle` CMD:
 
 ```bash
-go get github.com/unification-com/oracle
-go install github.com/unification-com/oracle/cmd/wrkoracle
+cd oracle
+go install ./cmd/wrkoracle
 ```
 
 4. Check it installed OK:
@@ -33,7 +32,7 @@ wrkoracle --version
 Should output something like
 
 ```
-[~]$ wrkoracle version 0.3.0-alpha
+[~]$ wrkoracle version 0.3.1-alpha
 ```
 
 You can run:
