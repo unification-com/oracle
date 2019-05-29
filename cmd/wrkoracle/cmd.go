@@ -183,7 +183,7 @@ func registerWrkchain(ctx *cli.Context) error {
 
 	block := genesis.ToBlock(nil)
 
-	genesisHash := block.Hash()
+	genesisHash := block.Header().GoEthereumHash()
 	wrkchainNetworkID := genesis.Config.ChainId
 
 	fmt.Println("Registering WRKChain with:")
@@ -386,7 +386,7 @@ func pollWrkchain(
 			Fatalf("Could not get latest WRKChain Block: ", err)
 		}
 
-		blockHash := latestWrkchainHeader.Hash()
+		blockHash := latestWrkchainHeader.GoEthereumHash()
 		parentHash := [32]byte{0}
 		receiptHash := [32]byte{0}
 		txHash := [32]byte{0}
