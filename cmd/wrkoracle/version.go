@@ -11,7 +11,7 @@ VersionMeta : Version metadata to append to the version string
 const (
 	VersionMajor = 0
 	VersionMinor = 3
-	VersionPatch = 1
+	VersionPatch = 2
 	VersionMeta  = "alpha"
 )
 

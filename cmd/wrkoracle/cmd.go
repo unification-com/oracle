@@ -183,7 +183,7 @@ func registerWrkchain(ctx *cli.Context) error {
 
 	block := genesis.ToBlock(nil)
 
-	genesisHash := block.Hash()
+	genesisHash := block.Header().GoEthereumHash()
 	wrkchainNetworkID := genesis.Config.ChainId
 
 	fmt.Println("Registering WRKChain with:")
@@ -265,7 +265,7 @@ func registerWrkchain(ctx *cli.Context) error {
 	deposit, _ := mainchainClient.StorageAt(ctxBg, common.HexToAddress(WRKChainRootContractAddress), common.HexToHash(DepositStorageAddress), nil)
 	depositAmount := big.NewInt(0).SetBytes(deposit)
 	// ToDo: implement ethclient.estimateGas
-	approxGas := uint64(300000)
+	approxGas := uint64(1000000)
 
 	totalAmount := big.NewInt(0)
 	totalAmount.Add(depositAmount, big.NewInt(0).SetUint64(approxGas))
@@ -355,7 +355,7 @@ func pollWrkchain(
 
 	frequency := ctx.Int64(WriteFrequencyFlag.Name)
 
-	approxGas := uint64(300000)
+	approxGas := uint64(1000000)
 
 	for {
 
@@ -386,7 +386,7 @@ func pollWrkchain(
 			Fatalf("Could not get latest WRKChain Block: ", err)
 		}
 
-		blockHash := latestWrkchainHeader.Hash()
+		blockHash := latestWrkchainHeader.GoEthereumHash()
 		parentHash := [32]byte{0}
 		receiptHash := [32]byte{0}
 		txHash := [32]byte{0}
