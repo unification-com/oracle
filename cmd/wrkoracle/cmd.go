@@ -33,8 +33,8 @@ DefaultMainchainMainnetRPC: Default UND Mainchain JSON RPC URL for maainnet
 const (
 	WRKChainRootContractAddress = "0x0000000000000000000000000000000000000087"
 	DepositStorageAddress       = "0x0000000000000000000000000000000000000000000000000000000000000000"
-	DefaultMainchainTestnetRPC  = "http://67.231.18.141:8101"
-	DefaultMainchainMainnetRPC  = "http://67.231.18.141:8101"
+	DefaultMainchainTestnetRPC  = "https://rpc-testnet.unification.io"
+	DefaultMainchainMainnetRPC  = "https://rpc-testnet.unification.io"
 )
 
 var (
