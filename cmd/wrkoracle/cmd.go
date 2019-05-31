@@ -33,8 +33,8 @@ DefaultMainchainMainnetRPC: Default UND Mainchain JSON RPC URL for maainnet
 const (
 	WRKChainRootContractAddress = "0x0000000000000000000000000000000000000087"
 	DepositStorageAddress       = "0x0000000000000000000000000000000000000000000000000000000000000000"
-	DefaultMainchainTestnetRPC  = "http://67.231.18.141:8101"
-	DefaultMainchainMainnetRPC  = "http://67.231.18.141:8101"
+	DefaultMainchainTestnetRPC  = "https://rpc-testnet.unification.io"
+	DefaultMainchainMainnetRPC  = "https://rpc-testnet.unification.io"
 )
 
 var (
@@ -265,7 +265,7 @@ func registerWrkchain(ctx *cli.Context) error {
 	deposit, _ := mainchainClient.StorageAt(ctxBg, common.HexToAddress(WRKChainRootContractAddress), common.HexToHash(DepositStorageAddress), nil)
 	depositAmount := big.NewInt(0).SetBytes(deposit)
 	// ToDo: implement ethclient.estimateGas
-	approxGas := uint64(1000000)
+	approxGas := uint64(10000000)
 
 	totalAmount := big.NewInt(0)
 	totalAmount.Add(depositAmount, big.NewInt(0).SetUint64(approxGas))
@@ -355,7 +355,7 @@ func pollWrkchain(
 
 	frequency := ctx.Int64(WriteFrequencyFlag.Name)
 
-	approxGas := uint64(1000000)
+	approxGas := uint64(10000000)
 
 	for {
 
