@@ -285,7 +285,6 @@ func registerWrkchain(ctx *cli.Context) error {
 
 	nonce, _ := mainchainClient.PendingNonceAt(ctxBg, thisAccount)
 	fmt.Printf("PendingNonceAt: %v\n", nonce)
-	lastPendingNonce = nonce
 
 	wrkchainRootSession.TransactOpts.Value = depositAmount
 	wrkchainRootSession.TransactOpts.Nonce = big.NewInt(int64(nonce))
@@ -334,8 +333,6 @@ func recordWrkchainBlock(ctx *cli.Context) error {
 	if err != nil {
 		Fatalf("Could not get WRKChain Network ID: ", err)
 	}
-
-	lastPendingNonce, _ = mainchainClient.PendingNonceAt(context.Background(), thisAccount)
 
 	pollWrkchain(ctx, mainchainClient, &wrkchainRootSession, wrkChainClient, wrkchainNetworkID, thisAccount)
 
