@@ -289,6 +289,7 @@ func registerWrkchain(ctx *cli.Context) error {
 
 	wrkchainRootSession.TransactOpts.Value = depositAmount
 	wrkchainRootSession.TransactOpts.Nonce = big.NewInt(int64(nonce))
+	wrkchainRootSession.TransactOpts.GasLimit = 240000 // pseudo gas limit. Never consumed, but used to calculate block gas consumption
 
 	tx, err := wrkchainRootSession.RegisterWrkChain(wrkchainNetworkID, authAddresses, genesisHash)
 
@@ -377,7 +378,7 @@ func pollWrkchain(
 		nonce, _ := mainchainClient.PendingNonceAt(context.Background(), thisAccount)
 		fmt.Printf("PendingNonceAt: %v\n", nonce)
 		fmt.Printf("lastPendingNonce: %v\n", lastPendingNonce)
-		for nonce <= lastPendingNonce {
+		if nonce == lastPendingNonce {
 			nonce++
 		}
 		lastPendingNonce = nonce
@@ -455,6 +456,7 @@ func record(
 
 	wrkchainRootSession.TransactOpts.Value = big.NewInt(0)
 	wrkchainRootSession.TransactOpts.Nonce = big.NewInt(int64(nonce))
+	wrkchainRootSession.TransactOpts.GasLimit = 240000 // pseudo gas limit. Never consumed, but used to calculate block gas consumption
 
 	tx, err := wrkchainRootSession.RecordHeader(wrkchainNetworkID, blockHeight, blockHash, parentHash, receiptHash, txHash, rootHash, sealer)
 
