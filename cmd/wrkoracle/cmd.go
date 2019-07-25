@@ -35,6 +35,7 @@ const (
 	DepositStorageAddress       = "0x0000000000000000000000000000000000000000000000000000000000000000"
 	DefaultMainchainTestnetRPC  = "https://rpc-testnet.unification.io"
 	DefaultMainchainMainnetRPC  = "https://rpc-testnet.unification.io"
+	WRKChainRootTax = 1
 )
 
 var (
@@ -95,6 +96,8 @@ The register command registers a new WRKChain on the UND Mainchain`,
 The record command runs the WRKChain Block Heaader Hash recorder and submits WRKChain hashes to Mainchain.
 A WRKChain requires registering first, with the register command`,
 	}
+
+	lastPendingNonce uint64 = 0
 )
 
 func initOracle(ctx *cli.Context) error {
@@ -264,11 +267,11 @@ func registerWrkchain(ctx *cli.Context) error {
 	// Required deposit amount held in first storage value in WRKChain Root contract
 	deposit, _ := mainchainClient.StorageAt(ctxBg, common.HexToAddress(WRKChainRootContractAddress), common.HexToHash(DepositStorageAddress), nil)
 	depositAmount := big.NewInt(0).SetBytes(deposit)
-	// ToDo: implement ethclient.estimateGas
-	approxGas := uint64(10000000)
+
+	fmt.Printf("depositAmount = %s\n", depositAmount.String())
 
 	totalAmount := big.NewInt(0)
-	totalAmount.Add(depositAmount, big.NewInt(0).SetUint64(approxGas))
+	totalAmount.Add(depositAmount, calcTax())
 
 	if balance.Cmp(totalAmount) == -1 {
 		Fatalf("Not enough UND to register",
@@ -280,18 +283,12 @@ func registerWrkchain(ctx *cli.Context) error {
 		)
 	}
 
-	nonce, _ := mainchainClient.NonceAt(ctxBg, thisAccount, nil)
-	fmt.Printf("NonceAt: %v\n", nonce)
-
-	gasPrice, err := mainchainClient.SuggestGasPrice(context.Background())
-	if err != nil {
-		Fatalf("Couldn't get gas price", "err", err)
-	}
+	nonce, _ := mainchainClient.PendingNonceAt(ctxBg, thisAccount)
+	fmt.Printf("PendingNonceAt: %v\n", nonce)
 
 	wrkchainRootSession.TransactOpts.Value = depositAmount
 	wrkchainRootSession.TransactOpts.Nonce = big.NewInt(int64(nonce))
-	wrkchainRootSession.TransactOpts.GasLimit = approxGas
-	wrkchainRootSession.TransactOpts.GasPrice = gasPrice
+	wrkchainRootSession.TransactOpts.GasLimit = 240000 // pseudo gas limit. Never consumed, but used to calculate block gas consumption
 
 	tx, err := wrkchainRootSession.RegisterWrkChain(wrkchainNetworkID, authAddresses, genesisHash)
 
@@ -355,8 +352,6 @@ func pollWrkchain(
 
 	frequency := ctx.Int64(WriteFrequencyFlag.Name)
 
-	approxGas := uint64(10000000)
-
 	for {
 
 		// get UND Balance
@@ -367,7 +362,7 @@ func pollWrkchain(
 		undValue := new(big.Float).Quo(balanceFloat, big.NewFloat(math.Pow10(18)))
 		fmt.Println("Balance for", thisAccount.Hex(), undValue, "UND")
 
-		if balance.Cmp(big.NewInt(0).SetUint64(approxGas)) == -1 {
+		if balance.Cmp(calcTax()) == -1 {
 			Fatalf("Not enough UND to record",
 				"account",
 				ctx.String(AccountUnlockFlag.Name),
@@ -377,8 +372,13 @@ func pollWrkchain(
 			)
 		}
 
-		nonce, _ := mainchainClient.NonceAt(context.Background(), thisAccount, nil)
-		gasPrice, _ := mainchainClient.SuggestGasPrice(context.Background())
+		nonce, _ := mainchainClient.PendingNonceAt(context.Background(), thisAccount)
+		fmt.Printf("PendingNonceAt: %v\n", nonce)
+		fmt.Printf("lastPendingNonce: %v\n", lastPendingNonce)
+		if nonce == lastPendingNonce {
+			nonce++
+		}
+		lastPendingNonce = nonce
 
 		latestWrkchainHeader, err := wrkChainClient.HeaderByNumber(context.Background(), nil)
 
@@ -419,9 +419,7 @@ func pollWrkchain(
 			rootHash,
 			thisAccount,
 			frequency,
-			nonce,
-			gasPrice,
-			approxGas)
+			nonce)
 
 		<-time.After(time.Duration(frequency) * time.Second)
 	}
@@ -439,9 +437,7 @@ func record(
 	rootHash [32]byte,
 	sealer common.Address,
 	frequency int64,
-	nonce uint64,
-	gasPrice *big.Int,
-	approxGas uint64) {
+	nonce uint64) {
 
 	fmt.Println("WRKChain Network ID:", wrkchainNetworkID)
 	fmt.Println("blockHeight", blockHeight)
@@ -451,13 +447,13 @@ func record(
 	fmt.Println("txHash", common.ToHex(txHash[:]))
 	fmt.Println("rootHash", common.ToHex(rootHash[:]))
 	fmt.Println("sealer", sealer.Hex())
+	fmt.Println("nonce", nonce)
 
 	fmt.Println("Sending Tx to WRKChain Root on Mainchain")
 
 	wrkchainRootSession.TransactOpts.Value = big.NewInt(0)
 	wrkchainRootSession.TransactOpts.Nonce = big.NewInt(int64(nonce))
-	wrkchainRootSession.TransactOpts.GasLimit = approxGas
-	wrkchainRootSession.TransactOpts.GasPrice = gasPrice
+	wrkchainRootSession.TransactOpts.GasLimit = 240000 // pseudo gas limit. Never consumed, but used to calculate block gas consumption
 
 	tx, err := wrkchainRootSession.RecordHeader(wrkchainNetworkID, blockHeight, blockHash, parentHash, receiptHash, txHash, rootHash, sealer)
 
@@ -539,4 +535,10 @@ func LoadContract(session wrkchainroot.WRKChainRootSession, client *ethclient.Cl
 	}
 	session.Contract = instance
 	return session
+}
+
+func calcTax() *big.Int {
+	tax := big.NewInt(WRKChainRootTax)
+	tax.Mul(tax, big.NewInt(1e18))
+	return tax
 }
