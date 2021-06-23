@@ -14,6 +14,7 @@ import (
 	"github.com/unification-com/mainchain/core"
 	"github.com/unification-com/mainchain/crypto"
 	"github.com/unification-com/mainchain/ethclient"
+	"github.com/unification-com/mainchain/params"
 	"gopkg.in/urfave/cli.v1"
 	"io/ioutil"
 	"math"
@@ -35,7 +36,6 @@ const (
 	DepositStorageAddress       = "0x0000000000000000000000000000000000000000000000000000000000000000"
 	DefaultMainchainTestnetRPC  = "https://rpc-testnet.unification.io"
 	DefaultMainchainMainnetRPC  = "https://rpc-testnet.unification.io"
-	WRKChainRootTax = 1
 )
 
 var (
@@ -187,11 +187,12 @@ func registerWrkchain(ctx *cli.Context) error {
 	block := genesis.ToBlock(nil)
 
 	genesisHash := block.Header().GoEthereumHash()
-	wrkchainNetworkID := genesis.Config.ChainId
+	// Geth based chains store ChainID as Big.Int. Convert to 32 byte hash
+	wrkchainNetworkID := common.BytesToHash(genesis.Config.ChainID.Bytes())
 
 	fmt.Println("Registering WRKChain with:")
 	fmt.Println("WRKChain Genesis Hash:", genesisHash.Hex())
-	fmt.Println("WRKChain Network ID:", wrkchainNetworkID)
+	fmt.Println("WRKChain Network ID:", wrkchainNetworkID.Big())
 
 	// Process authorised addresses
 	if !ctx.IsSet(AuthorisedAccountsFlag.Name) {
@@ -246,7 +247,7 @@ func registerWrkchain(ctx *cli.Context) error {
 	filterOpts.End = nil
 	filterOpts.Context = ctxBg
 
-	wrkchainIDFilterList := make([]*big.Int, 0)
+	wrkchainIDFilterList := make([][32]byte, 0)
 	wrkchainIDFilterList = append(wrkchainIDFilterList, wrkchainNetworkID)
 
 	registerWrkChainEvents, err := wrkchainRootSession.Contract.FilterRegisterWrkChain(filterOpts, wrkchainIDFilterList)
@@ -258,22 +259,20 @@ func registerWrkchain(ctx *cli.Context) error {
 
 	if registerWrkChainEvents.Next() {
 		// already registered. Output info and exit
-		fmt.Println("Found WRKChain ID:", registerWrkChainEvents.Event.ChainId.String())
+		cID := new(big.Int)
+		cID.SetBytes(registerWrkChainEvents.Event.ChainId[:])
+		fmt.Println("Found WRKChain ID:", cID)
 		fmt.Println("with Genesis Hash", hexutil.Encode(registerWrkChainEvents.Event.GenesisHash[:]))
 		Fatalf("WRKChain already registered in Tx", registerWrkChainEvents.Event.Raw.TxHash.Hex())
 	}
 
 	// gather up params for registering WRKChain
-	// Required deposit amount held in first storage value in WRKChain Root contract
-	deposit, _ := mainchainClient.StorageAt(ctxBg, common.HexToAddress(WRKChainRootContractAddress), common.HexToHash(DepositStorageAddress), nil)
-	depositAmount := big.NewInt(0).SetBytes(deposit)
+	// Required registration fee
+	regFee := calcTax(true)
 
-	fmt.Printf("depositAmount = %s\n", depositAmount.String())
+	fmt.Printf("WRKChain registration fee = %s\n", regFee.String())
 
-	totalAmount := big.NewInt(0)
-	totalAmount.Add(depositAmount, calcTax())
-
-	if balance.Cmp(totalAmount) == -1 {
+	if balance.Cmp(regFee) == -1 {
 		Fatalf("Not enough UND to register",
 			"account",
 			ctx.String(AccountUnlockFlag.Name),
@@ -286,9 +285,11 @@ func registerWrkchain(ctx *cli.Context) error {
 	nonce, _ := mainchainClient.PendingNonceAt(ctxBg, thisAccount)
 	fmt.Printf("PendingNonceAt: %v\n", nonce)
 
-	wrkchainRootSession.TransactOpts.Value = depositAmount
 	wrkchainRootSession.TransactOpts.Nonce = big.NewInt(int64(nonce))
-	wrkchainRootSession.TransactOpts.GasLimit = 240000 // pseudo gas limit. Never consumed, but used to calculate block gas consumption
+
+	// pseudo gas limit. Never charged, but used to calculate block gas consumption
+	// and ansure Tx gets processed
+	wrkchainRootSession.TransactOpts.GasLimit = 240000
 
 	tx, err := wrkchainRootSession.RegisterWrkChain(wrkchainNetworkID, authAddresses, genesisHash)
 
@@ -329,12 +330,12 @@ func recordWrkchainBlock(ctx *cli.Context) error {
 	wrkChainClient, _ := ethclient.Dial(strings.TrimSpace(ctx.String(WRKChainJSONRPCFlag.Name)))
 
 	wrkchainNetworkID, err := wrkChainClient.NetworkID(ctxBg)
-
 	if err != nil {
 		Fatalf("Could not get WRKChain Network ID: ", err)
 	}
+	wrkchainNetworkIDBytes := common.BytesToHash(wrkchainNetworkID.Bytes())
 
-	pollWrkchain(ctx, mainchainClient, &wrkchainRootSession, wrkChainClient, wrkchainNetworkID, thisAccount)
+	pollWrkchain(ctx, mainchainClient, &wrkchainRootSession, wrkChainClient, wrkchainNetworkIDBytes, thisAccount)
 
 	return nil
 }
@@ -344,7 +345,7 @@ func pollWrkchain(
 	mainchainClient *ethclient.Client,
 	wrkchainRootSession *wrkchainroot.WRKChainRootSession,
 	wrkChainClient *ethclient.Client,
-	wrkchainNetworkID *big.Int,
+	wrkchainNetworkID [32]byte,
 	thisAccount common.Address,
 ) {
 
@@ -362,7 +363,7 @@ func pollWrkchain(
 		undValue := new(big.Float).Quo(balanceFloat, big.NewFloat(math.Pow10(18)))
 		fmt.Println("Balance for", thisAccount.Hex(), undValue, "UND")
 
-		if balance.Cmp(calcTax()) == -1 {
+		if balance.Cmp(calcTax(false)) == -1 {
 			Fatalf("Not enough UND to record",
 				"account",
 				ctx.String(AccountUnlockFlag.Name),
@@ -428,25 +429,28 @@ func pollWrkchain(
 
 func record(
 	wrkchainRootSession *wrkchainroot.WRKChainRootSession,
-	wrkchainNetworkID *big.Int,
+	wrkchainNetworkID [32]byte,
 	blockHeight *big.Int,
 	blockHash [32]byte,
 	parentHash [32]byte,
 	receiptHash [32]byte,
 	txHash [32]byte,
 	rootHash [32]byte,
-	sealer common.Address,
+	sender common.Address,
 	frequency int64,
 	nonce uint64) {
 
-	fmt.Println("WRKChain Network ID:", wrkchainNetworkID)
+	cID := new(big.Int)
+	cID.SetBytes(wrkchainNetworkID[:])
+
+	fmt.Println("WRKChain Network ID:", cID)
 	fmt.Println("blockHeight", blockHeight)
 	fmt.Println("blockHash", common.ToHex(blockHash[:]))
 	fmt.Println("parentHash", common.ToHex(parentHash[:]))
 	fmt.Println("receiptHash", common.ToHex(receiptHash[:]))
 	fmt.Println("txHash", common.ToHex(txHash[:]))
 	fmt.Println("rootHash", common.ToHex(rootHash[:]))
-	fmt.Println("sealer", sealer.Hex())
+	fmt.Println("sender", sender.Hex())
 	fmt.Println("nonce", nonce)
 
 	fmt.Println("Sending Tx to WRKChain Root on Mainchain")
@@ -455,7 +459,7 @@ func record(
 	wrkchainRootSession.TransactOpts.Nonce = big.NewInt(int64(nonce))
 	wrkchainRootSession.TransactOpts.GasLimit = 240000 // pseudo gas limit. Never consumed, but used to calculate block gas consumption
 
-	tx, err := wrkchainRootSession.RecordHeader(wrkchainNetworkID, blockHeight, blockHash, parentHash, receiptHash, txHash, rootHash, sealer)
+	tx, err := wrkchainRootSession.RecordHeader(wrkchainNetworkID, blockHeight, blockHash, parentHash, receiptHash, txHash, rootHash)
 
 	if err != nil {
 		Fatalf("Could not record WRKChain Header:", err)
@@ -537,8 +541,12 @@ func LoadContract(session wrkchainroot.WRKChainRootSession, client *ethclient.Cl
 	return session
 }
 
-func calcTax() *big.Int {
-	tax := big.NewInt(WRKChainRootTax)
-	tax.Mul(tax, big.NewInt(1e18))
-	return tax
+func calcTax(isReg bool) *big.Int {
+    taxUnd := params.WRKChainRootTax
+    if isReg {
+        taxUnd = params.WRKChainRegFee
+    }
+    tax := new(big.Int).SetUint64(taxUnd)
+    tax.Mul(tax, big.NewInt(params.Ether))
+    return tax
 }
